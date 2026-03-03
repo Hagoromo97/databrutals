@@ -940,8 +940,6 @@ export function RouteList() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredRoutes.map((route) => {
-          const isKL    = (route.name + " " + route.code).toLowerCase().includes("kl")
-          const isSel   = (route.name + " " + route.code).toLowerCase().includes("sel")
           return (
           <div key={route.id}>
             {/* Card */}
