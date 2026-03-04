@@ -840,7 +840,7 @@ export function RouteList() {
   return (
     <div className="relative font-light flex-1 overflow-y-auto">
       {/* Route List */}
-      <div className="p-5 md:p-8" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
+      <div className="p-4 md:p-8 max-w-3xl mx-auto w-full" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
         {/* Page header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
