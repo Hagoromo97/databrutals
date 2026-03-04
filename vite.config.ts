@@ -6,6 +6,18 @@ import { defineConfig } from "vite"
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    esbuildOptions: {
+      loader: {
+        '.jpg': 'file',
+        '.jpeg': 'file',
+        '.png': 'file',
+        '.gif': 'file',
+        '.webp': 'file',
+        '.svg': 'text',
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -19,7 +31,6 @@ export default defineConfig({
       },
       output: {
         manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
           'vendor-radix': [
             '@radix-ui/react-dialog',
             '@radix-ui/react-dropdown-menu',

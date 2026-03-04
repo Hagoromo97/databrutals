@@ -185,6 +185,7 @@
 }
 .nav-collapsible-content {
   overflow: hidden;
+  will-change: height;
 }
 .nav-collapsible-content[data-state="open"] {
   animation: collapsible-slide-down 0.25s cubic-bezier(0.4, 0, 0.2, 1);

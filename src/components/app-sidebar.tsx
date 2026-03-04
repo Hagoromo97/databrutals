@@ -4,8 +4,6 @@ import * as React from "react"
 import {
   Calendar,
   Package,
-  Pencil,
-  Moon,
   Search,
   X,
   Images,
@@ -25,7 +23,6 @@ import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
 import { useTheme } from "@/hooks/use-theme"
-import { InputSwitch } from "primereact/inputswitch"
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +31,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 const data = {
@@ -129,6 +127,7 @@ export function AppSidebar({
   const [unsavedDialogOpen, setUnsavedDialogOpen] = React.useState(false)
   const { isEditMode, setIsEditMode, hasUnsavedChanges, saveChanges, isSaving, discardChanges } = useEditMode()
   const { theme, toggleTheme } = useTheme()
+  const { isMobile, setOpen, setOpenMobile } = useSidebar()
 
   // Mutually exclusive: opening a Platform submenu closes Settings, and vice versa
   const handleNavItemChange = (item: string | null) => {
@@ -169,6 +168,11 @@ export function AppSidebar({
 
   const handleSubItemClick = (page: string) => {
     onNavigate?.(page)
+    if (isMobile) {
+      setOpenMobile(false)
+    } else {
+      setOpen(false)
+    }
   }
 
   return (
@@ -228,48 +232,19 @@ export function AppSidebar({
           settingsOpen={settingsOpen}
           onSettingsOpenChange={handleSettingsOpenChange}
           currentPage={currentPage}
-          onNavigate={onNavigate}
+          onNavigate={(page) => {
+            onNavigate?.(page)
+            if (isMobile) setOpenMobile(false)
+            else setOpen(false)
+          }}
           searchQuery={searchQuery}
+          isEditMode={isEditMode}
+          onEditModeToggle={handleEditModeToggle}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
       </SidebarContent>
       <SidebarFooter>
-        {/* Edit Mode + Theme toggle strip */}
-        <div className="flex flex-col px-2 py-1 border-t border-border/50">
-          {/* Edit Mode row */}
-          <div className="flex items-center justify-between px-2 py-2.5">
-            <button
-              onClick={handleEditModeToggle}
-              className={`flex items-center gap-2.5 text-sm font-medium w-full px-0 rounded-md transition-colors duration-200 ${
-                isEditMode ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Pencil className="size-4 shrink-0" />
-              <span>Edit Mode</span>
-              <span className={`ml-auto text-[10px] px-2 py-0.5 rounded font-semibold ${
-                isEditMode ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}>
-                {isEditMode ? "ON" : "OFF"}
-              </span>
-            </button>
-          </div>
-          {/* Dark Mode row */}
-          <div className="flex items-center justify-between px-2 py-2.5">
-            <div className="flex items-center gap-2.5 text-sm font-medium text-muted-foreground">
-              <Moon className="size-4 shrink-0" />
-              <span>Dark Mode</span>
-            </div>
-            <div className="sidebar-switch">
-              <InputSwitch
-                checked={theme === "dark"}
-                onChange={() => toggleTheme()}
-                pt={{
-                  root: { style: { width: "2.75rem", height: "1.5rem", flexShrink: "0" } },
-                  slider: { style: { borderRadius: "9999px" } },
-                }}
-              />
-            </div>
-          </div>
-        </div>
         <NavUser user={data.user} />
       </SidebarFooter>
     </Sidebar>

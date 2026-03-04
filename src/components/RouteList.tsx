@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
-import { List, Info, Plus, Check, X, Edit2, Trash2, Search, Settings, Save, ArrowUp, ArrowDown, Truck, Loader2, Maximize2, Minimize2, SlidersHorizontal, Pin, PinOff, MoreVertical, CheckCircle2, MapPin, Route, AlertCircle, Map } from "lucide-react"
+import { List, Info, Plus, Check, X, Edit2, Trash2, Search, Settings, Save, ArrowUp, ArrowDown, Truck, Loader2, Maximize2, Minimize2, SlidersHorizontal, CheckCircle2, MapPin, AlertCircle, Map, History, ChevronLeft } from "lucide-react"
 import { toast } from "sonner"
-import { Card } from "primereact/card"
 import { DeliveryMap } from "@/components/DeliveryMap"
-import { RowInfoModal } from "./RowInfoModal"
 import { RouteNotesModal, appendChangelog } from "./RouteNotesModal"
+import { RowInfoModal } from "./RowInfoModal"
 import { useEditMode } from "@/contexts/EditModeContext"
 import {
   Dialog,
@@ -27,13 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+
 
 interface DeliveryPoint {
   code: string
@@ -89,6 +82,19 @@ function formatKm(km: number): string {
   return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)} Km`
 }
 
+function formatRelativeLog(dateStr?: string): string {
+  if (!dateStr) return "Never"
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins  = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days  = Math.floor(diff / 86_400_000)
+  if (mins  <  1)  return "just now"
+  if (mins  < 60)  return `${mins} minute${mins === 1 ? "" : "s"} ago`
+  if (hours < 24)  return `${hours} hour${hours === 1 ? "" : "s"} ago`
+  if (days  < 30)  return `${days} day${days === 1 ? "" : "s"} ago`
+  return "long time ago"
+}
+
 const DEFAULT_ROUTES: Route[] = [
   {
     id: "route-1",
@@ -135,12 +141,15 @@ export function RouteList() {
   const routesSnapshotRef = useRef<Route[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentRouteId, setCurrentRouteId] = useState<string>("route-1")
+  const [addRouteDialogOpen, setAddRouteDialogOpen] = useState(false)
   const [infoModalOpen, setInfoModalOpen] = useState(false)
   const [selectedPoint, setSelectedPoint] = useState<DeliveryPoint | null>(null)
-  const [addRouteDialogOpen, setAddRouteDialogOpen] = useState(false)
-  const [editRouteDialogOpen, setEditRouteDialogOpen] = useState(false)
   const [deleteRouteConfirmOpen, setDeleteRouteConfirmOpen] = useState(false)
   const [editingRoute, setEditingRoute] = useState<Route | null>(null)
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null)
+  const [inlineLogId, setInlineLogId] = useState<string | null>(null)
+  const [routeChangelogs, setRouteChangelogs] = useState<Record<string, { id: string; text: string; created_at: string }[]>>({})
+  const [changelogLoading, setChangelogLoading] = useState<string | null>(null)
   const [routeToDelete, setRouteToDelete] = useState<Route | null>(null)
   const [newRoute, setNewRoute] = useState({ name: "", code: "", shift: "AM" })
   const [searchQuery, setSearchQuery] = useState("")
@@ -155,26 +164,21 @@ export function RouteList() {
   const [notesRouteName, setNotesRouteName] = useState<string>("")
   const [notesInitialTab, setNotesInitialTab] = useState<"notes" | "changelog" | "info">("notes")
 
-  // Pinned routes stored in localStorage
-  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("fcalendar_pinned_routes") || "[]").map((r: { id: string }) => r.id)) }
-    catch { return new Set() }
-  })
 
-  function togglePin(route: Route) {
-    const stored: Array<{ id: string; name: string; code: string; shift: string }> = (() => {
-      try { return JSON.parse(localStorage.getItem("fcalendar_pinned_routes") || "[]") } catch { return [] }
-    })()
-    let updated
-    if (pinnedIds.has(route.id)) {
-      updated = stored.filter(r => r.id !== route.id)
-    } else {
-      updated = [...stored.filter(r => r.id !== route.id), { id: route.id, name: route.name, code: route.code, shift: route.shift }]
-    }
-    localStorage.setItem("fcalendar_pinned_routes", JSON.stringify(updated))
-    setPinnedIds(new Set(updated.map(r => r.id)))
-    window.dispatchEvent(new Event("fcalendar_pins_changed"))
-  }
+
+  // Fetch changelog entries for inline log panel
+  const loadInlineChangelog = useCallback(async (routeId: string) => {
+    if (routeChangelogs[routeId]) return // already cached
+    setChangelogLoading(routeId)
+    try {
+      const res = await fetch(`/api/route-notes?routeId=${encodeURIComponent(routeId)}`)
+      const data = await res.json()
+      if (data.success) {
+        setRouteChangelogs(prev => ({ ...prev, [routeId]: data.changelog ?? [] }))
+      }
+    } catch {}
+    finally { setChangelogLoading(null) }
+  }, [routeChangelogs])
 
   // Fetch routes from database
   const fetchRoutes = useCallback(async (preserveCurrentId?: string) => {
@@ -631,7 +635,7 @@ export function RouteList() {
 
   const handleEditRoute = (route: Route) => {
     setEditingRoute({ ...route })
-    setEditRouteDialogOpen(true)
+    setInlineEditId(route.id)
   }
 
   const handleSaveRoute = () => {
@@ -650,7 +654,7 @@ export function RouteList() {
     setRoutes(prev => prev.map(r => 
       r.id === editingRoute.id ? editingRoute : r
     ))
-    setEditRouteDialogOpen(false)
+    setInlineEditId(null)
     const saved = editingRoute
     setEditingRoute(null)
     toast.success("Route updated", {
@@ -950,88 +954,242 @@ export function RouteList() {
               const activeCount = points.filter(p => isDeliveryActive(p.delivery)).length
               const deliveryTypes = [...new Set(points.map(p => p.delivery))]
 
-              const cardHeader = (
-                <div className="px-4 pt-5 pb-3">
-                  {/* Title row */}
-                  <p className="text-base font-bold text-foreground leading-tight text-center">{route.name}</p>
-                  <div className="flex items-center justify-center gap-2 mt-1.5">
-                    <span className="text-xs font-mono text-muted-foreground">{route.code}</span>
-                    <span className="text-muted-foreground/40 text-xs">|</span>
-                    <span className="text-xs font-semibold text-muted-foreground">{route.shift || '—'}</span>
-                  </div>
-                  <hr className="border-border/60 mt-3" />
-                  {/* Location list */}
-                  <ul className="mt-3 space-y-1.5">
-                    {preview.map((p, idx) => (
-                      <li key={p.code} className="flex items-center gap-2 text-sm">
-                        <span className="shrink-0 w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">{idx + 1}</span>
-                        <span className="truncate text-foreground/80">{p.name || p.code}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {remaining > 0 && (
-                    <p className="mt-2 text-xs text-muted-foreground pl-7">+{remaining} more location{remaining > 1 ? 's' : ''}</p>
-                  )}
-                  {/* Badges */}
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-green-500 text-white">
-                      {activeCount} Active
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-500 text-white">
-                      {points.length} Stop{points.length !== 1 ? 's' : ''}
-                    </span>
-                    {deliveryTypes.map(type => (
-                      <span key={type} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-primary text-primary-foreground">
-                        {type}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )
+              const isKL  = (route.name + " " + route.code).toLowerCase().includes("kl")
+              const isSel = (route.name + " " + route.code).toLowerCase().includes("sel")
 
-              const cardFooter = (
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
-                    onClick={() => { setCurrentRouteId(route.id); setDetailDialogOpen(true) }}
-                  >
-                    <List className="size-4" />
-                    <span>View</span>
-                  </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                        <MoreVertical className="size-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => { setNotesRouteId(route.id); setNotesRouteName(route.name); setNotesInitialTab("info"); setNotesModalOpen(true) }}>
-                        <Info className="size-3.5 mr-2" />Info
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => togglePin(route)} className={pinnedIds.has(route.id) ? 'text-amber-500' : ''}>
-                        {pinnedIds.has(route.id)
-                          ? <><PinOff className="size-3.5 mr-2" />Unpin</>
-                          : <><Pin className="size-3.5 mr-2" />Pin to Home</>}
-                      </DropdownMenuItem>
-                      {isEditMode && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleEditRoute(route)}>
-                            <Settings className="size-3.5 mr-2" />Settings
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )
+              const isEditing = inlineEditId === route.id
+              const isLogging = inlineLogId === route.id
+              const isSlid = isEditing || isLogging
+
               return (
-                <Card
-                  header={cardHeader}
-                  footer={cardFooter}
-                  className="overflow-hidden rounded-xl shadow-sm border border-border/60 bg-card"
-                />
+                <div className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm hover:shadow-md hover:border-border transition-all duration-200 relative">
+
+                  {/* Accent top bar */}
+                  <div className={`h-1 w-full shrink-0 ${isKL ? "bg-blue-500" : isSel ? "bg-red-500" : "bg-primary"}`} />
+
+                  {/* Sliding wrapper */}
+                  <div className="relative overflow-hidden min-h-[320px]">
+
+                    {/* ── VIEW SIDE ── */}
+                    <div className={`transition-transform duration-300 ease-in-out ${isSlid ? "-translate-x-full" : "translate-x-0"}`}>
+                      <div className="px-4 pt-4 pb-3 flex flex-col gap-3">
+
+                        {/* Title row */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {isKL
+                              ? <img src="/kl-flag.png" className="rounded shadow-sm ring-1 ring-black/10 dark:ring-white/10 shrink-0 object-cover" style={{ width: 32, height: 20 }} alt="KL" />
+                              : isSel
+                              ? <img src="/selangor-flag.png" className="rounded shadow-sm ring-1 ring-black/10 dark:ring-white/10 shrink-0 object-cover" style={{ width: 32, height: 20 }} alt="Sel" />
+                              : <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Truck className="size-4 text-primary" /></div>
+                            }
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-foreground leading-tight truncate">{route.name}</p>
+                              <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{route.code}</p>
+                            </div>
+                          </div>
+                          <span className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg ${
+                            route.shift === "AM" ? "bg-orange-500/10 text-orange-600 dark:text-orange-400" : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                          }`}>{route.shift || "—"}</span>
+                        </div>
+
+                        <div className="border-t border-border/50" />
+
+                        {/* Location list */}
+                        <ul className="space-y-1.5">
+                          {preview.map((p, idx) => (
+                            <li key={p.code} className="flex items-center gap-2">
+                              <span className="shrink-0 w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">{idx + 1}</span>
+                              <span className="truncate text-xs text-foreground/80 font-medium">{p.name || p.code}</span>
+                              <span className={`ml-auto shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                                isDeliveryActive(p.delivery)
+                                  ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                                  : "bg-red-500/10 text-red-600 dark:text-red-400"
+                              }`}>{isDeliveryActive(p.delivery) ? "●" : "○"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {remaining > 0 && (
+                          <p className="text-[11px] text-muted-foreground/70 pl-6">+{remaining} more location{remaining > 1 ? "s" : ""}</p>
+                        )}
+
+                        <div className="border-t border-border/40" />
+
+                        {/* Stats badges */}
+                        <div className="flex flex-col items-center gap-1.5 pb-1">
+                          <div className="flex justify-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-500/10 text-green-700 dark:text-green-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />{activeCount} Active
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted text-muted-foreground">
+                              <MapPin className="size-2.5 shrink-0" />{points.length} Stop{points.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap justify-center gap-1.5">
+                            {deliveryTypes.map(type => (
+                              <span key={type} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-primary/10 text-primary">{type}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── LOG SIDE (slides in from right) ── */}
+                    <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${isLogging ? "translate-x-0" : "translate-x-full"}`}>
+                      <div className="px-4 pt-4 pb-3 flex flex-col gap-3 h-full overflow-hidden">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`w-1.5 h-5 rounded-full ${isKL ? "bg-blue-500" : isSel ? "bg-red-500" : "bg-primary"}`} />
+                          <History className="size-3.5 text-muted-foreground" />
+                          <p className="text-sm font-bold text-foreground">Change Log</p>
+                          {changelogLoading === route.id && <Loader2 className="size-3.5 animate-spin text-muted-foreground ml-auto" />}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
+                          {changelogLoading === route.id ? (
+                            <div className="flex items-center justify-center h-24 text-muted-foreground">
+                              <Loader2 className="size-5 animate-spin" />
+                            </div>
+                          ) : (routeChangelogs[route.id] ?? []).length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-24 gap-2 text-muted-foreground">
+                              <History className="size-6 opacity-30" />
+                              <p className="text-xs">No changes recorded yet</p>
+                            </div>
+                          ) : (
+                            (routeChangelogs[route.id] ?? []).map((entry) => (
+                              <div key={entry.id} className="flex gap-2.5 group">
+                                <div className="flex flex-col items-center pt-0.5">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1" />
+                                  <div className="w-px flex-1 bg-border/50 mt-1" />
+                                </div>
+                                <div className="pb-2 flex-1 min-w-0">
+                                  <p className="text-xs text-foreground/90 leading-relaxed">{entry.text}</p>
+                                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                    {new Date(entry.created_at).toLocaleString("en-MY", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Updated timestamp */}
+                        <div className="border-t border-border/40 pt-2 pb-1 text-center">
+                          <p className="text-[10px] text-muted-foreground/50 font-medium tracking-wide">
+                            Updated&nbsp;&nbsp;<span className="text-muted-foreground/70">{formatRelativeLog(route.updatedAt)}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── EDIT SIDE (slides in from right) ── */}
+                    <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${isEditing ? "translate-x-0" : "translate-x-full"}`}>
+                      {editingRoute && inlineEditId === route.id && (
+                        <div className="px-4 pt-4 pb-3 flex flex-col gap-3 h-full">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className={`w-1.5 h-5 rounded-full ${isKL ? "bg-blue-500" : isSel ? "bg-red-500" : "bg-primary"}`} />
+                            <p className="text-sm font-bold text-foreground">Edit Route</p>
+                          </div>
+
+                          <div className="space-y-3 flex-1">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Route Name</label>
+                              <Input
+                                className="h-8 text-sm"
+                                placeholder="Route name"
+                                value={editingRoute.name}
+                                onChange={e => setEditingRoute({ ...editingRoute, name: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Route Code</label>
+                              <Input
+                                className="h-8 text-sm font-mono"
+                                placeholder="Route code"
+                                value={editingRoute.code}
+                                onChange={e => setEditingRoute({ ...editingRoute, code: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Shift</label>
+                              <select
+                                value={editingRoute.shift}
+                                onChange={e => setEditingRoute({ ...editingRoute, shift: e.target.value })}
+                                className="w-full h-8 rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                              >
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                                <option value="Night">Night</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Shared footer — view / log / edit actions */}
+                  <div className="border-t border-border/50 flex shrink-0">
+                    {isEditing ? (
+                      <>
+                        <button
+                          className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-destructive hover:bg-destructive/8 transition-colors"
+                          onClick={() => { if (editingRoute) { setRouteToDelete(editingRoute); setInlineEditId(null); setEditingRoute(null); setDeleteRouteConfirmOpen(true) } }}
+                        >
+                          <Trash2 className="size-3.5" />Delete
+                        </button>
+                        <div className="flex-1" />
+                        <button
+                          className="px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition-colors border-l border-border/50"
+                          onClick={() => { setInlineEditId(null); setEditingRoute(null) }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="px-4 py-2.5 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors flex items-center gap-1 border-l border-primary/20"
+                          onClick={handleSaveRoute}
+                        >
+                          <Check className="size-3" />Save
+                        </button>
+                      </>
+                    ) : isLogging ? (
+                      <button
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                        onClick={() => setInlineLogId(null)}
+                      >
+                        <ChevronLeft className="size-3.5" />Back
+                      </button>
+                    ) : (
+                      <>
+                        {isEditMode && (
+                          <>
+                            <button
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                              onClick={() => handleEditRoute(route)}
+                            >
+                              <Edit2 className="size-3.5" />Edit
+                            </button>
+                            <div className="w-px bg-border/50 shrink-0" />
+                          </>
+                        )}
+                        <button
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                          onClick={() => { setInlineLogId(route.id); loadInlineChangelog(route.id) }}
+                        >
+                          <History className="size-3.5" />Log
+                        </button>
+                        <div className="w-px bg-border/50 shrink-0" />
+                        <button
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-primary hover:bg-primary/8 transition-colors"
+                          onClick={() => { setCurrentRouteId(route.id); setDetailDialogOpen(true) }}
+                        >
+                          <List className="size-3.5" />View
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                </div>
               )
             })()}
                   <Dialog open={detailDialogOpen && route.id === currentRouteId} onOpenChange={(open) => { if (!open) { setDetailDialogOpen(false); setDetailFullscreen(false); setSelectedRows([]); setDialogView('table') } }}>
@@ -1297,23 +1455,23 @@ export function RouteList() {
                                       </td>
                                     )
                                   }
-                                  if (col.key === 'action') return null
+                                  if (col.key === 'action') return (
+                                    <td key="action" className="px-3 h-9 text-center">
+                                      <button
+                                        className={`inline-flex items-center justify-center p-1 rounded transition-colors duration-150 ${
+                                          isActive
+                                            ? 'text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                            : 'text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                        }`}
+                                        onClick={() => { setSelectedPoint(point); setInfoModalOpen(true) }}
+                                      >
+                                        <Info className="size-3.5" />
+                                      </button>
+                                    </td>
+                                  )
                                   return null
                                 })}
-                                {columns.find(c => c.key === 'action' && c.visible) && (
-                                  <td className="px-3 h-9 text-center">
-                                    <button
-                                      className={`inline-flex items-center justify-center p-1 rounded transition-colors duration-150 ${
-                                        isActive
-                                          ? 'text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-                                          : 'text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                      }`}
-                                      onClick={() => { setSelectedPoint(point); setInfoModalOpen(true) }}
-                                    >
-                                      <Info className="size-3.5" />
-                                    </button>
-                                  </td>
-                                )}
+
                               </tr>
                             )
                           })}
@@ -1665,6 +1823,7 @@ export function RouteList() {
                     }}
                   />
                 )}
+
           </div>
           )
         })}
@@ -1781,82 +1940,7 @@ export function RouteList() {
         )}
         </div>
 
-        {/* Edit Route Dialog */}
-        <Dialog open={editRouteDialogOpen} onOpenChange={setEditRouteDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Route</DialogTitle>
-              <DialogDescription>
-                Update route information
-              </DialogDescription>
-            </DialogHeader>
-            
-            {editingRoute && (
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Route Name *</label>
-                  <Input
-                    placeholder="Enter route name"
-                    value={editingRoute.name}
-                    onChange={(e) => setEditingRoute({ ...editingRoute, name: e.target.value })}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Route Code *</label>
-                  <Input
-                    placeholder="Enter route code"
-                    value={editingRoute.code}
-                    onChange={(e) => setEditingRoute({ ...editingRoute, code: e.target.value })}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Shift</label>
-                  <select
-                    value={editingRoute.shift}
-                    onChange={(e) => setEditingRoute({ ...editingRoute, shift: e.target.value })}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                    <option value="Night">Night</option>
-                  </select>
-                </div>
-                
-                <div className="flex justify-between items-center pt-4">
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      setRouteToDelete(editingRoute)
-                      setEditRouteDialogOpen(false)
-                      setDeleteRouteConfirmOpen(true)
-                    }}
-                  >
-                    <Trash2 className="size-4 mr-2" />
-                    Delete Route
-                  </Button>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setEditRouteDialogOpen(false)
-                        setEditingRoute(null)
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={handleSaveRoute}>
-                      <Check className="size-4 mr-2" />
-                      Save Changes
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+
 
         {/* Delete Route Confirmation Dialog */}
         <Dialog open={deleteRouteConfirmOpen} onOpenChange={setDeleteRouteConfirmOpen}>
