@@ -30,15 +30,6 @@ export const FONT_OPTIONS: { id: AppFont; label: string; family: string; googleI
 export type AppZoom = "80" | "85" | "90" | "95" | "100" | "105" | "110" | "115" | "120"
 export type TextSize = "13" | "14" | "15" | "16" | "17" | "18" | "20"
 
-/** Detect device type at runtime based on screen width */
-function getDeviceDefaults(): { zoom: AppZoom; textSize: TextSize } {
-  if (typeof window === "undefined") return { zoom: "100", textSize: "16" }
-  const w = window.innerWidth
-  if (w < 768) return { zoom: "90", textSize: "14" }   // mobile
-  if (w < 1024) return { zoom: "95", textSize: "15" }  // tablet
-  return { zoom: "100", textSize: "16" }                // desktop
-}
-
 /** Inject a Google Fonts <link> once per font id */
 const loadedFonts = new Set<string>()
 function loadGoogleFont(googleId: string) {
@@ -67,11 +58,11 @@ export function useTheme() {
   })
 
   const [appZoom, setAppZoom] = useState<AppZoom>(() => {
-    return (localStorage.getItem("app-zoom") as AppZoom | null) ?? getDeviceDefaults().zoom
+    return (localStorage.getItem("app-zoom") as AppZoom | null) ?? "100"
   })
 
   const [textSize, setTextSize] = useState<TextSize>(() => {
-    return (localStorage.getItem("text-size") as TextSize | null) ?? getDeviceDefaults().textSize
+    return (localStorage.getItem("text-size") as TextSize | null) ?? "16"
   })
 
   // Color mode + theme
@@ -108,13 +99,13 @@ export function useTheme() {
     localStorage.setItem("app-font", appFont)
   }, [appFont])
 
-  // App zoom (scales entire layout)
+  // App zoom — CSS custom property (avoids non-standard zoom hack)
   useEffect(() => {
-    document.documentElement.style.zoom = `${appZoom}%`
+    document.documentElement.style.setProperty("--user-zoom", String(parseInt(appZoom) / 100))
     localStorage.setItem("app-zoom", appZoom)
   }, [appZoom])
 
-  // Text size — stored in CSS custom property so DeviceProvider can scale it
+  // Text size — base font size preference
   useEffect(() => {
     document.documentElement.style.setProperty("--text-size-base", `${textSize}px`)
     localStorage.setItem("text-size", textSize)

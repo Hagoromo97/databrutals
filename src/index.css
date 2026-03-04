@@ -199,32 +199,31 @@
 html {
   height: 100%;
   /*
-   * Fluid device-aware font-size:
-   *   --text-size-base  → user's chosen size (set by useTheme, default 16px)
-   *   --app-font-scale  → device multiplier  (set by DeviceProvider)
-   *      mobile  < 768px  → 0.875  (~87.5% of user pref)
-   *      tablet  768-1024 → 0.9375 (~93.75%)
-   *      desktop > 1024px → 1.0    (100%)
+   * Standard fluid font-size system:
+   *   --text-size-base  → user's chosen base size (useTheme, default 16px)
+   *   --user-zoom       → user's zoom preference  (useTheme, default 1.0)
+   *   --device-scale    → auto device multiplier  (CSS media queries below)
    *
-   * clamp() ensures font never goes below 13px or above --text-size-base.
+   * Result: one clean formula, no JS zoom hacks, no layered overrides.
    */
-  --text-size-base: 16px;   /* fallback; overridden by useTheme */
-  --app-font-scale: 1;       /* overridden by DeviceProvider */
+  --text-size-base: 16px;
+  --user-zoom: 1;
+  --device-scale: 1;
   font-size: clamp(
-    13px,
-    calc(var(--text-size-base) * var(--app-font-scale)),
-    var(--text-size-base)
+    12px,
+    calc(var(--text-size-base) * var(--user-zoom) * var(--device-scale)),
+    22px
   );
 
   /* Fluid text scale helpers — use these in components */
-  --fs-2xs: clamp(0.625rem, 1.4vw, 0.6875rem);  /* ~10-11px */
-  --fs-xs:  clamp(0.6875rem, 1.8vw, 0.75rem);   /* ~11-12px */
-  --fs-sm:  clamp(0.75rem,   2vw,   0.875rem);   /* ~12-14px */
-  --fs-md:  clamp(0.875rem,  2.3vw, 1rem);       /* ~14-16px */
-  --fs-lg:  clamp(1rem,      2.6vw, 1.125rem);   /* ~16-18px */
-  --fs-xl:  clamp(1.125rem,  3vw,   1.25rem);    /* ~18-20px */
-  --fs-2xl: clamp(1.25rem,   3.8vw, 1.5rem);     /* ~20-24px */
-  --fs-3xl: clamp(1.5rem,    4.5vw, 1.875rem);   /* ~24-30px */
+  --fs-2xs: clamp(0.625rem, 1.4vw, 0.6875rem);
+  --fs-xs:  clamp(0.6875rem, 1.8vw, 0.75rem);
+  --fs-sm:  clamp(0.75rem,   2vw,   0.875rem);
+  --fs-md:  clamp(0.875rem,  2.3vw, 1rem);
+  --fs-lg:  clamp(1rem,      2.6vw, 1.125rem);
+  --fs-xl:  clamp(1.125rem,  3vw,   1.25rem);
+  --fs-2xl: clamp(1.25rem,   3.8vw, 1.5rem);
+  --fs-3xl: clamp(1.5rem,    4.5vw, 1.875rem);
 
   /* Fluid spacing helpers */
   --sp-xs:  clamp(0.25rem, 0.8vw, 0.5rem);
@@ -233,6 +232,11 @@ html {
   --sp-lg:  clamp(1rem,    2.5vw, 1.5rem);
   --sp-xl:  clamp(1.5rem,  3.5vw, 2rem);
 }
+
+/* Device-aware auto scaling via standard media queries */
+@media (max-width: 767px)                        { html { --device-scale: 0.9375; } }
+@media (min-width: 768px) and (max-width: 1023px){ html { --device-scale: 0.96875; } }
+@media (min-width: 1024px)                       { html { --device-scale: 1; } }
 
 body {
   height: 100%;

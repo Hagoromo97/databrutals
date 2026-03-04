@@ -45,9 +45,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     const html = document.documentElement
     html.setAttribute("data-device", device)
     html.setAttribute("data-touch", isTouch ? "true" : "false")
-    // Fluid font scale via CSS custom property
-    html.style.setProperty("--app-font-scale", String(fontScale))
-  }, [device, isTouch, fontScale])
+    // Note: font scaling handled by CSS media queries in index.css
+  }, [device, isTouch])
 
   const value = React.useMemo<DeviceContextValue>(
     () => ({ device, isMobile, isTablet, isDesktop, isTouch, fontScale }),
