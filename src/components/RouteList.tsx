@@ -949,7 +949,7 @@ export function RouteList() {
 
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-[412px] mx-auto sm:max-w-none sm:mx-0 w-full">
         {filteredRoutes.map((route) => {
           return (
           <div key={route.id}>
