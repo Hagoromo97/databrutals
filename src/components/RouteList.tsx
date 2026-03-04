@@ -164,6 +164,13 @@ export function RouteList() {
   const [notesRouteName, setNotesRouteName] = useState<string>("")
   const [notesInitialTab, setNotesInitialTab] = useState<"notes" | "changelog" | "info">("notes")
 
+  const openNotesModal = useCallback((routeId: string, routeName: string, tab: "notes" | "changelog" | "info" = "notes") => {
+    setNotesRouteId(routeId)
+    setNotesRouteName(routeName)
+    setNotesInitialTab(tab)
+    setNotesModalOpen(true)
+  }, [])
+
 
 
   // Fetch changelog entries for inline log panel
@@ -627,7 +634,7 @@ export function RouteList() {
       setSelectedTargetRoute("")
       toast.success(`${count} location${count !== 1 ? 's' : ''} moved`, {
         description: `Moved to "${destName}" · remember to save.`,
-        icon: <Route className="size-4 text-primary" />,
+        icon: <Truck className="size-4 text-primary" />,
         duration: 3000,
       })
     }
