@@ -1003,12 +1003,12 @@ export function RouteList() {
                         <div className="border-t border-border/50" />
 
                         {/* Location list */}
-                        <ul className="space-y-1.5">
+                        <ul className="space-y-2">
                           {preview.map((p, idx) => (
-                            <li key={p.code} className="flex items-center gap-2">
-                              <span className="shrink-0 w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">{idx + 1}</span>
-                              <span className="truncate text-xs text-foreground/80 font-medium">{p.name || p.code}</span>
-                              <span className={`ml-auto shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                            <li key={p.code} className="flex items-center gap-2.5">
+                              <span className="shrink-0 w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground tabular-nums">{idx + 1}</span>
+                              <span className="truncate text-xs text-foreground/85 font-medium flex-1">{p.name || p.code}</span>
+                              <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
                                 isDeliveryActive(p.delivery)
                                   ? "bg-green-500/10 text-green-700 dark:text-green-400"
                                   : "bg-red-500/10 text-red-600 dark:text-red-400"
@@ -1017,26 +1017,22 @@ export function RouteList() {
                           ))}
                         </ul>
                         {remaining > 0 && (
-                          <p className="text-[11px] text-muted-foreground/70 pl-6">+{remaining} more location{remaining > 1 ? "s" : ""}</p>
+                          <p className="text-[11px] text-muted-foreground/60 pl-[26px]">+{remaining} more location{remaining > 1 ? "s" : ""}</p>
                         )}
 
                         <div className="border-t border-border/40" />
 
                         {/* Stats badges */}
-                        <div className="flex flex-col items-center gap-1.5 pb-1">
-                          <div className="flex justify-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-500/10 text-green-700 dark:text-green-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />{activeCount} Active
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted text-muted-foreground">
-                              <MapPin className="size-2.5 shrink-0" />{points.length} Stop{points.length !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap justify-center gap-1.5">
-                            {deliveryTypes.map(type => (
-                              <span key={type} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-primary/10 text-primary">{type}</span>
-                            ))}
-                          </div>
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 pb-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold bg-green-500/10 text-green-700 dark:text-green-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />{activeCount} Active
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold bg-muted text-muted-foreground">
+                            <MapPin className="size-2.5 shrink-0" />{points.length} Stop{points.length !== 1 ? "s" : ""}
+                          </span>
+                          {deliveryTypes.map(type => (
+                            <span key={type} className="px-2 py-1 rounded-md text-[10px] font-semibold bg-primary/10 text-primary">{type}</span>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -1138,27 +1134,41 @@ export function RouteList() {
                   {/* Shared footer — view / log / edit actions */}
                   <div className="border-t border-border/50 flex shrink-0">
                     {isEditing ? (
-                      <>
-                        <button
-                          className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-destructive hover:bg-destructive/8 transition-colors"
-                          onClick={() => { if (editingRoute) { setRouteToDelete(editingRoute); setInlineEditId(null); setEditingRoute(null); setDeleteRouteConfirmOpen(true) } }}
-                        >
-                          <Trash2 className="size-3.5" />Delete
-                        </button>
-                        <div className="flex-1" />
-                        <button
-                          className="px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition-colors border-l border-border/50"
-                          onClick={() => { setInlineEditId(null); setEditingRoute(null) }}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          className="px-4 py-2.5 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors flex items-center gap-1 border-l border-primary/20"
-                          onClick={handleSaveRoute}
-                        >
-                          <Check className="size-3" />Save
-                        </button>
-                      </>
+                      (() => {
+                        const origRoute = routes.find(r => r.id === inlineEditId)
+                        const editHasChanges = editingRoute && origRoute && (
+                          origRoute.name !== editingRoute.name ||
+                          origRoute.code !== editingRoute.code ||
+                          origRoute.shift !== editingRoute.shift
+                        )
+                        return (
+                          <>
+                            <button
+                              className="px-4 py-2.5 text-xs font-semibold text-destructive hover:bg-destructive/8 transition-colors"
+                              onClick={() => { if (editingRoute) { setRouteToDelete(editingRoute); setInlineEditId(null); setEditingRoute(null); setDeleteRouteConfirmOpen(true) } }}
+                            >
+                              Delete
+                            </button>
+                            <div className="flex-1" />
+                            <button
+                              className="px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition-colors border-l border-border/50"
+                              onClick={() => { setInlineEditId(null); setEditingRoute(null) }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              className={`px-4 py-2.5 text-xs font-semibold transition-colors border-l ${
+                                editHasChanges
+                                  ? "bg-green-500 text-white hover:bg-green-600 border-green-600/30"
+                                  : "text-muted-foreground hover:bg-muted/60 border-border/50"
+                              }`}
+                              onClick={handleSaveRoute}
+                            >
+                              Save
+                            </button>
+                          </>
+                        )
+                      })()
                     ) : isLogging ? (
                       <button
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
@@ -1170,28 +1180,49 @@ export function RouteList() {
                       <>
                         {isEditMode && (
                           <>
-                            <button
-                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                              onClick={() => handleEditRoute(route)}
-                            >
-                              <Edit2 className="size-3.5" />Edit
-                            </button>
+                            <TooltipProvider delayDuration={300}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    className="flex-1 flex items-center justify-center py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                                    onClick={() => handleEditRoute(route)}
+                                  >
+                                    <Edit2 className="size-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top"><p>Edit Route</p></TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <div className="w-px bg-border/50 shrink-0" />
                           </>
                         )}
-                        <button
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                          onClick={() => { setInlineLogId(route.id); loadInlineChangelog(route.id) }}
-                        >
-                          <History className="size-3.5" />Log
-                        </button>
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="flex-1 flex items-center justify-center py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                                onClick={() => { setInlineLogId(route.id); loadInlineChangelog(route.id) }}
+                              >
+                                <History className="size-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top"><p>Change Log</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <div className="w-px bg-border/50 shrink-0" />
-                        <button
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-primary hover:bg-primary/8 transition-colors"
-                          onClick={() => { setCurrentRouteId(route.id); setDetailDialogOpen(true) }}
-                        >
-                          <List className="size-3.5" />View
-                        </button>
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="flex-1 flex items-center justify-center py-2.5 text-primary hover:bg-primary/8 transition-colors"
+                                onClick={() => { setCurrentRouteId(route.id); setDetailDialogOpen(true) }}
+                              >
+                                <List className="size-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top"><p>View Details</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </>
                     )}
                   </div>

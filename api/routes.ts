@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await sql`DELETE FROM routes`;
       }
 
-      // Upsert each route
+      // Upsert each route — only touch updated_at when content actually changed
       for (const route of routes) {
         await sql`
           INSERT INTO routes (id, name, code, shift, delivery_points, updated_at)
@@ -54,7 +54,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 code = EXCLUDED.code,
                 shift = EXCLUDED.shift,
                 delivery_points = EXCLUDED.delivery_points,
-                updated_at = NOW()
+                updated_at = CASE
+                  WHEN routes.name != EXCLUDED.name
+                    OR routes.code != EXCLUDED.code
+                    OR routes.shift != EXCLUDED.shift
+                    OR routes.delivery_points::text != EXCLUDED.delivery_points::text
+                  THEN NOW()
+                  ELSE routes.updated_at
+                END
         `;
       }
 
