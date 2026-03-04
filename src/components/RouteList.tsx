@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
-import { List, Info, Plus, Check, X, Edit2, Trash2, Search, Settings, Save, ArrowUp, ArrowDown, Truck, Loader2, Maximize2, Minimize2, SlidersHorizontal, CheckCircle2, MapPin, AlertCircle, Map, History, ChevronLeft } from "lucide-react"
+import { List, Info, Plus, Check, X, Edit2, Trash2, Search, Settings, Save, ArrowUp, ArrowDown, Truck, Loader2, Maximize2, Minimize2, SlidersHorizontal, CheckCircle2, MapPin, AlertCircle, Map, History, ChevronLeft, StickyNote } from "lucide-react"
 import { toast } from "sonner"
 import { DeliveryMap } from "@/components/DeliveryMap"
 import { RouteNotesModal, appendChangelog } from "./RouteNotesModal"
@@ -1223,6 +1223,9 @@ export function RouteList() {
                       </div>
                       <Button variant="outline" size="sm" onClick={() => openSettings(route.id)} className="shrink-0 flex items-center gap-2 h-9 rounded-xl text-xs px-4">
                         <Settings className="size-4" />Settings
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => openNotesModal(route.id, route.name)} className="shrink-0 flex items-center gap-2 h-9 rounded-xl text-xs px-4">
+                        <StickyNote className="size-4" />Notes
                       </Button>
                       <Button
                         variant="outline"
